@@ -110,8 +110,17 @@ class StremioAuthExtractor:
         await submit_button.click()
 
         # Wait for login completion
+        # Wait for login completion
         self.logger.info("Waiting for login completion")
-        await page.wait_for_timeout(5000)
+        # Wait for the login button to disappear or a known element of the logged-in state to appear
+        try:
+             await page.wait_for_selector('div.form-button-vyqqj:has-text("Log in")', state='hidden', timeout=10000)
+             self.logger.info("Login form disappeared")
+        except:
+             self.logger.warning("Login form might still be visible, checking for success indicators")
+
+        # Consider logged in if we can see the library or user profile, or simply wait for network idle
+        await page.wait_for_load_state("networkidle")
 
     async def _fill_credentials(self, page):
         """Fill email and password fields"""
@@ -179,12 +188,8 @@ async def extract_stremio_auth_key(headless=True, browser_type="chromium"):
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     
-    # Only add handler if none exists
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(asctime)s | %(levelname)s | %(message)s', 
-                                             datefmt='%Y-%m-%d %H:%M:%S'))
-        logger.addHandler(handler)
+    # Do not add manual handlers here as it causes duplication when root logger is configured
+    # The caller is responsible for configuring logging
     
     extractor = StremioAuthExtractor(browser_type=browser_type, logger=logger)
     return await extractor.extract_auth_key(headless=headless)
